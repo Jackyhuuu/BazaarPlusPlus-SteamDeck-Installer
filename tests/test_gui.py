@@ -63,3 +63,16 @@ class GuiTests(unittest.TestCase):
                 patch('deck_installer.gui.QDesktopServices.openUrl') as open_url:
             self.window.checked('installer', data)
         self.assertEqual(open_url.call_args.args[0].toString(), data['url'])
+
+    def test_resolution_entry_copies_full_preset_and_can_return_to_original(self):
+        self.window.open_resolution()
+        self.app.processEvents()
+        self.assertTrue(self.window.advanced.isVisible())
+        self.assertTrue(self.window.native_resolution.isChecked())
+        self.window.copy_launch_options()
+        self.assertIn('-screen-width 1280 -screen-height 800', self.app.clipboard().text())
+        self.assertIn('WINEDLLOVERRIDES', self.app.clipboard().text())
+        self.window.native_resolution.setChecked(False)
+        self.window.copy_launch_options()
+        self.assertNotIn('-screen-width', self.app.clipboard().text())
+        self.assertIn('1.0.0', self.window.appversion.text())
