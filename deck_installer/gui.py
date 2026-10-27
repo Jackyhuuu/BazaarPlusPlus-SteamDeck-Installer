@@ -9,8 +9,8 @@ from PySide6.QtCore import QSettings, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QFont
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QProgressBar,
-    QPlainTextEdit, QFileDialog, QMessageBox, QInputDialog, QFrame, QScrollArea)
-from deck_installer import core, __version__
+    QPlainTextEdit, QFileDialog, QMessageBox, QInputDialog, QFrame, QScrollArea, QCheckBox)
+from deck_installer import core, __version__, __channel__
 from deck_installer.tasks import TEXT, Detector, Worker, Checker
 
 TEXT.update({
@@ -49,6 +49,12 @@ TEXT.update({
     'downgrade': ('当前安装版本高于官方清单。继续会安装较旧版本，是否继续？',
                   'Your installed version is newer than the official release. Continue with a downgrade?'),
     'copy': ('复制', 'Copy'),
+    'resolution': ('1280×800 启动优化', '1280×800 launch preset'),
+    'native_resolution': ('以 1280×800 无边框全屏启动游戏', 'Launch at 1280×800 in borderless fullscreen'),
+    'launch_short': ('复制完整配置，在 Steam → 游戏属性 → 启动选项中粘贴一次。已有自定义选项时请合并。',
+                     'Copy this configuration into Steam → Properties → Launch Options once. Merge any existing custom options.'),
+    'launch_copied': ('启动配置已复制。请到 Steam 游戏属性中粘贴一次。',
+                      'Launch configuration copied. Paste it into the Steam game properties once.'),
 })
 
 STYLE = '''
@@ -203,6 +209,8 @@ class Window(QMainWindow):
         self.details = button(self.toggle_log, 'quiet')
         extras.addWidget(self.more)
         extras.addWidget(self.details)
+        self.resolution = button(self.open_resolution, 'quiet')
+        extras.addWidget(self.resolution)
         extras.addStretch()
         layout.addLayout(extras)
         self.advanced, advanced = self.card()
@@ -214,11 +222,15 @@ class Window(QMainWindow):
         advanced.addLayout(localrow)
         self.launch = label('muted', True)
         advanced.addWidget(self.launch)
+        self.native_resolution = QCheckBox()
+        self.native_resolution.setChecked(self.settings.value('native_resolution', True, type=bool))
+        self.native_resolution.toggled.connect(self.update_launch_options)
+        advanced.addWidget(self.native_resolution)
         launchrow = QHBoxLayout()
-        value = QLineEdit(core.LAUNCH_OPTIONS)
-        value.setReadOnly(True)
-        launchrow.addWidget(value, 1)
-        self.copy = button(lambda: QApplication.clipboard().setText(core.LAUNCH_OPTIONS))
+        self.launchvalue = QLineEdit(core.launch_options(self.native_resolution.isChecked()))
+        self.launchvalue.setReadOnly(True)
+        launchrow.addWidget(self.launchvalue, 1)
+        self.copy = button(self.copy_launch_options)
         launchrow.addWidget(self.copy)
         advanced.addLayout(launchrow)
         self.advanced.hide()
@@ -238,8 +250,6 @@ class Window(QMainWindow):
         layout.addStretch(1)
         footer = QHBoxLayout()
         self.appversion = label('muted')
-        suffix = f' · build {self.build_number}' if self.build_number else ''
-        self.appversion.setText('INSTALLER  ' + __version__ + suffix)
         footer.addWidget(self.appversion, 1)
         self.installer_check = button(self.check_installer, 'quiet')
         footer.addWidget(self.installer_check)
@@ -265,9 +275,10 @@ class Window(QMainWindow):
         self.lang = index
         self.settings.setValue('language', index)
         self.setWindowTitle(self.t('title') + ' · Steam Deck')
-        for key in ['subtitle', 'directory', 'browse', 'detect', 'local', 'restore', 'copy', 'logs', 'current_label', 'latest_label', 'check', 'secure', 'installer_check']:
+        for key in ['subtitle', 'directory', 'browse', 'detect', 'local', 'restore', 'copy', 'logs', 'current_label', 'latest_label', 'check', 'secure', 'installer_check', 'resolution', 'native_resolution']:
             getattr(self, key).setText(self.t(key))
         self.heading.setText(self.t('title'))
+        self.appversion.setText('INSTALLER ' + __version__ + (' · 正式版' if self.lang == 0 else ' · Stable'))
         self.more.setText(('▾ ' if self.advanced.isVisible() else '▸ ') + self.t('more'))
         self.details.setText(self.t('hide_details' if self.logbox.isVisible() else 'details'))
         self.launch.setText(self.t('launch_short'))
@@ -339,7 +350,7 @@ class Window(QMainWindow):
     def check_installer(self):
         if self.busy():
             return
-        worker = Checker('installer', __version__, self.build_number)
+        worker = Checker('installer', __version__, 10**9 if __channel__ == 'stable' else self.build_number)
         self.begin(worker, self.t('checking'))
         worker.result.connect(self.checked)
         worker.error.connect(self.check_failed)
@@ -477,6 +488,23 @@ class Window(QMainWindow):
     def toggle_more(self):
         self.advanced.setVisible(not self.advanced.isVisible())
         self.more.setText(('▾ ' if self.advanced.isVisible() else '▸ ') + self.t('more'))
+
+    def open_resolution(self):
+        self.advanced.show()
+        self.more.setText('▾ ' + self.t('more'))
+        self.native_resolution.setChecked(True)
+        self.update_launch_options()
+        self.copy.setFocus()
+        QTimer.singleShot(0, lambda: self.centralWidget().ensureWidgetVisible(self.copy))
+
+    def update_launch_options(self):
+        enabled = self.native_resolution.isChecked()
+        self.settings.setValue('native_resolution', enabled)
+        self.launchvalue.setText(core.launch_options(enabled))
+
+    def copy_launch_options(self):
+        QApplication.clipboard().setText(self.launchvalue.text())
+        self.status.setText(self.t('launch_copied'))
 
     def show_log(self):
         self.logbox.show()
