@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,8 @@ import urllib.request
 from urllib.parse import urlsplit
 import uuid
 import zipfile
+import certifi
+import xml.etree.ElementTree as ET
 
 MANIFESTS = (
     'https://cdn.bazaarplusplus.com/installer/latest/windows-x86_64.json',
@@ -54,10 +57,67 @@ class ReleaseRedirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def open_release(url):
+def open_release(url, timeout=30):
     safe_url(url)
-    return urllib.request.build_opener(ReleaseRedirect()).open(
-        urllib.request.Request(url, headers={'User-Agent': 'BPP-SteamDeck/0.1'}), timeout=30)
+    return urllib.request.build_opener(ReleaseRedirect(),
+        urllib.request.HTTPSHandler(context=tls_context())).open(
+        urllib.request.Request(url, headers={'User-Agent': 'BPP-SteamDeck/0.2'}), timeout=timeout)
+
+
+def tls_context():
+    # The build machine's OpenSSL CA path does not exist on SteamOS. Always
+    # carry Mozilla's root bundle; never disable certificate/hostname checks.
+    context = ssl.create_default_context(cafile=certifi.where())
+    try:
+        context.load_default_certs()
+    except (OSError, ssl.SSLError):
+        pass
+    return context
+
+
+def version_key(version):
+    match = re.match(r'^v?(\d+)\.(\d+)\.(\d+)', version or '')
+    return tuple(map(int, match.groups())) if match else None
+
+
+def installer_release(data, current_version, current_build=0):
+    releases = []
+    for item in data:
+        if item.get('draft'):
+            continue
+        tag = item.get('tag_name', '')
+        match = re.fullmatch(r'v(\d+)\.(\d+)\.(\d+)(?:-preview\.(\d+))?', tag)
+        if not match:
+            continue
+        url = item.get('html_url', '')
+        if url != 'https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/releases/tag/' + tag:
+            continue
+        parts = tuple(map(int, match.groups()[:3]))
+        build = int(match.group(4)) if match.group(4) else 10**9
+        releases.append((parts + (build,), tag, url))
+    if not releases:
+        raise ValueError('No published installer release')
+    key, tag, url = max(releases)
+    return {'tag': tag, 'url': url,
+            'newer': key > (version_key(current_version) or (0, 0, 0)) + (current_build,)}
+
+
+def latest_installer(current_version, current_build=0):
+    # Atom is public and does not consume GitHub's small anonymous API quota.
+    url = 'https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/releases.atom'
+    req = urllib.request.Request(url, headers={'User-Agent': 'BPP-SteamDeck/0.2'})
+    with urllib.request.build_opener(ReleaseRedirect(), urllib.request.HTTPSHandler(context=tls_context())).open(req, timeout=15) as r:
+        raw = r.read(2 * 1024 * 1024 + 1)
+    if len(raw) > 2 * 1024 * 1024:
+        raise ValueError('Release response exceeds limit')
+    ns = {'a': 'http://www.w3.org/2005/Atom'}
+    data = []
+    for entry in ET.fromstring(raw).findall('a:entry', ns):
+        link = entry.find('a:link', ns)
+        if link is not None:
+            address = link.get('href', '')
+            data.append({'tag_name': address.rsplit('/', 1)[-1], 'html_url': address})
+    return installer_release(data, current_version, current_build)
 
 
 def parse_manifest(data):
@@ -82,7 +142,7 @@ def latest(emit=lambda *args: None):
     failures = []
     for url in MANIFESTS:
         try:
-            with open_release(url) as r:
+            with open_release(url, timeout=8) as r:
                 raw = r.read(1024 * 1024 + 1)
             if len(raw) > 1024 * 1024:
                 raise ValueError('Manifest too large')
