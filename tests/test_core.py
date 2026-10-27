@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import zipfile
+import ssl
 
 from deck_installer import core
 
@@ -44,6 +45,26 @@ class CoreTests(unittest.TestCase):
         p = self.file(self.root, 'app.exe', b'test')
         with self.assertRaises(core.InstallError):
             core.verify(p, {'size': 4, 'sha256': '0' * 64})
+
+    def test_bundled_ca_works_without_system_certificate_paths(self):
+        with patch.dict(os.environ, {'SSL_CERT_FILE': '/nonexistent', 'SSL_CERT_DIR': '/nonexistent'}):
+            context = core.tls_context()
+        self.assertGreater(len(context.get_ca_certs()), 100)
+        self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(context.check_hostname)
+
+    def test_version_comparison_uses_numbers_and_ignores_prod_suffix(self):
+        self.assertEqual(core.version_key('5.7.0.prod'), (5, 7, 0))
+        self.assertGreater(core.version_key('5.10.0'), core.version_key('5.9.0'))
+        self.assertIsNone(core.version_key('unknown'))
+
+    def test_installer_update_selects_newer_published_release(self):
+        def item(tag, draft=False):
+            return {'tag_name': tag, 'draft': draft, 'html_url': 'https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/releases/tag/' + tag}
+        data = [item('v0.1.0-preview.3'), item('v0.2.0-preview.4'), item('v9.0.0', True)]
+        self.assertTrue(core.installer_release(data, '0.1.0', 3)['newer'])
+        self.assertFalse(core.installer_release(data, '0.2.0', 4)['newer'])
+        self.assertEqual(core.installer_release(data, '0.1.0', 3)['tag'], 'v0.2.0-preview.4')
 
     def test_redirect_cannot_leave_official_hosts(self):
         with self.assertRaises(core.InstallError):
