@@ -29,7 +29,7 @@
 
 Linux x86_64（推荐 Ubuntu 22.04）安装 Python 3.11 和工作流列出的系统依赖后，执行 `bash scripts/build-appimage.sh`。构建内含 Python、Qt、7zz，无需 Steam Deck 额外安装这些依赖。该命令在 macOS/ARM 上会明确失败，绝不生成改扩展名的文件。
 
-GitHub Actions 自动运行单元测试、Qt 无屏启动、PyInstaller 打包、AppDir 启动、ELF/AppImage 架构检查和最终 AppImage 启动检查。任何失败均阻止发布。产物位于 `dist/BazaarPlusPlus-SteamDeck-x86_64.AppImage`。
+GitHub Actions 自动运行单元测试、真实官方 5.7.0 EXE 安装/更新/恢复集成测试、Qt 无屏启动、PyInstaller 打包、AppDir 启动、ELF/AppImage 架构检查和最终 AppImage 启动检查。AppDir 与最终 AppImage 还会通过 Xvfb 的 X11 显示服务器进行图形启动测试。任何失败均阻止发布。产物位于 `dist/BazaarPlusPlus-SteamDeck-x86_64.AppImage`。
 
 本地开发：`python3 -m venv .venv`，安装 requirements.txt 后运行 `python launcher.py`。源码测试：`python -m unittest discover -s tests -v`。真实官方 EXE 集成测试由 BPP_TEST_EXE、BPP_TEST_SHA256、BPP_7ZZ 环境变量启用，测试仅写入临时模拟游戏目录。
 
