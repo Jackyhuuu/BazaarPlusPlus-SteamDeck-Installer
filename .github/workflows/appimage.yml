@@ -45,6 +45,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v0.1.0-preview.{0}', github.run_number) }}
+          TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v0.2.0-preview.{0}', github.run_number) }}
           REVISION: ${{ github.sha }}
         run: gh release create "$TAG" release/* --target "$REVISION" --prerelease --title "$TAG · Steam Deck preview" --notes 'Native Linux installer. Automated startup checks passed; Steam Deck hardware compatibility still needs validation. Download the AppImage asset, enable execution, and open it in Desktop Mode.'
