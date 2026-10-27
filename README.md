@@ -2,6 +2,8 @@
 
 独立社区项目，为 Steam Deck / Linux x86_64 提供原生 Qt 图形安装窗口，将**官方 Windows 版 Mod** 安装到通过 Proton 运行的《The Bazaar》。支持中文 / English，不打开浏览器界面。
 
+0.2.0 更新：主页面直接显示已安装版本与官方最新版，提供「检查更新」和明确的更新按钮；启动时自动检查 Mod 版本。底部「安装器更新」可检查本项目的新 AppImage，并在发现新版时打开下载页。高级选项与日志默认折叠。HTTPS 使用随包内置的 Mozilla 根证书，解决 SteamOS 上缺少打包机证书路径导致的 CERTIFICATE_VERIFY_FAILED；不关闭证书验证。
+
 ## 下载与使用
 
 发布下载：[Releases](https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/releases)。开发构建：[AppImage Actions](https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/actions/workflows/appimage.yml)，成功运行的 Artifacts 中包含 AppImage 和 SHA256SUMS；GitHub 下载 Actions 产物需要登录。main 和带 v 标签的成功构建会自动发布预览版，可直接下载单个 AppImage。
