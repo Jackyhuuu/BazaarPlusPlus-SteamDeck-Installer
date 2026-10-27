@@ -66,6 +66,22 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(core.installer_release(data, '0.2.0', 4)['newer'])
         self.assertEqual(core.installer_release(data, '0.1.0', 3)['tag'], 'v0.2.0-preview.4')
 
+    def test_native_launch_preset_keeps_mod_loader_and_can_be_disabled(self):
+        options = core.launch_options(True)
+        self.assertIn('WINEDLLOVERRIDES="winhttp=n,b" %command%', options)
+        self.assertIn('-screen-width 1280 -screen-height 800', options)
+        self.assertIn('-screen-fullscreen 1 -window-mode borderless', options)
+        self.assertEqual(options.count('%command%'), 1)
+        self.assertEqual(core.launch_options(False), core.LAUNCH_OPTIONS)
+
+    def test_stable_installer_does_not_offer_its_own_release_as_update(self):
+        def release(tag):
+            return {'tag_name': tag, 'html_url': 'https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/releases/tag/' + tag}
+        data = [release('v0.2.0-preview.4'), release('v1.0.0')]
+        self.assertFalse(core.installer_release(data, '1.0.0', 10**9)['newer'])
+        data.append(release('v1.0.1'))
+        self.assertTrue(core.installer_release(data, '1.0.0', 10**9)['newer'])
+
     def test_redirect_cannot_leave_official_hosts(self):
         with self.assertRaises(core.InstallError):
             core.ReleaseRedirect().redirect_request(None, None, 302, '', {}, 'https://evil.example/payload.exe')
