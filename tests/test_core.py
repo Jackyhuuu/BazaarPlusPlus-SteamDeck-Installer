@@ -141,9 +141,53 @@ class CoreTests(unittest.TestCase):
         game = library / 'steamapps/common/The Bazaar'
         game.mkdir(parents=True)
         (game / 'TheBazaar.exe').write_bytes(b'game')
+        (game / 'TheBazaar_Data').mkdir()
         self.file(home, '.local/share/Steam/steamapps/libraryfolders.vdf',
                   ('"libraryfolders" { "1" { "path" "' + str(library) + '" } }').encode())
         self.assertIn(game.resolve(), core.discover(home, self.root / 'media'))
+
+    def test_detection_config_vdf_and_nested_manifest_game(self):
+        home = self.root / 'home'
+        library = self.root / 'custom-library'
+        game = library / 'steamapps/common/custom-name/Windows/Release'
+        game.mkdir(parents=True)
+        (game / 'TheBazaar.exe').write_bytes(b'game')
+        (game / 'TheBazaar_Data').mkdir()
+        self.file(home, '.steam/root/config/libraryfolders.vdf',
+                  ('"libraryfolders" { "1" "' + str(library) + '" }').encode())
+        self.file(library, 'steamapps/appmanifest_123.acf',
+                  b'"AppState" { "name" "The Bazaar" "installdir" "custom-name" }')
+        messages = []
+        games = core.discover(home, self.root / 'media', lambda zh, en: messages.append(en))
+        self.assertIn(game.resolve(), games)
+        self.assertTrue(any('Steam manifest location:' in m for m in messages))
+
+    def test_detection_sd_card_nested_steamlibrary_without_vdf(self):
+        media = self.root / 'media'
+        game = media / 'deck/card/SteamLibrary/steamapps/common/The Bazaar/Windows'
+        game.mkdir(parents=True)
+        (game / 'TheBazaar.exe').write_bytes(b'game')
+        (game / 'TheBazaar_Data').mkdir()
+        self.assertIn(game.resolve(), core.discover(self.root / 'home', media))
+
+    def test_detection_unreadable_library_does_not_abort_other_libraries(self):
+        home = self.root / 'home'
+        game = home / '.local/share/Steam/steamapps/common/The Bazaar'
+        game.mkdir(parents=True)
+        (game / 'TheBazaar.exe').write_bytes(b'game')
+        (game / 'TheBazaar_Data').mkdir()
+        broken = home / '.steam/root/steamapps/common'
+        broken.mkdir(parents=True)
+        original = Path.iterdir
+        def denied(path):
+            if path == broken.resolve():
+                raise PermissionError('simulated permission failure')
+            return original(path)
+        messages = []
+        with patch.object(Path, 'iterdir', denied):
+            games = core.discover(home, self.root / 'media', lambda zh, en: messages.append(en))
+        self.assertIn(game.resolve(), games)
+        self.assertTrue(any('Cannot read:' in m for m in messages))
 
     @unittest.skipUnless(os.environ.get('BPP_TEST_EXE'), 'Set BPP_TEST_EXE to test a real official installer')
     def test_real_exe_install_update_restore(self):
