@@ -35,6 +35,12 @@ MAX_PAYLOAD = 512 * 1024 * 1024
 STATE = '.bazaarplusplus-deck'
 RECEIPT = STATE + '/receipt.json'
 LAUNCH_OPTIONS = 'WINEDLLOVERRIDES="winhttp=n,b" %command%'
+DECK_DISPLAY_OPTIONS = '-screen-width 1280 -screen-height 800 -screen-fullscreen 1 -window-mode borderless'
+
+
+def launch_options(native_resolution=True):
+    """Prepare a per-game preset; never change the desktop or Steam configuration."""
+    return LAUNCH_OPTIONS + (' ' + DECK_DISPLAY_OPTIONS if native_resolution else '')
 
 
 class InstallError(Exception):
