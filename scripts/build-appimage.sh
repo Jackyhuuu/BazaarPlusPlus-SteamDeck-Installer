@@ -23,8 +23,14 @@ BPP_7ZZ="$PWD/vendor/7zz" BPP_TEST_EXE="$PWD/build/test-official.exe" \
   BPP_TEST_SHA256=91c2386aea38118d1f9a12ef0b7ff95ad9ff816878e742319d23fa81b2f1f25c \
   .venv/bin/python -m unittest discover -s tests -v
 QT_QPA_PLATFORM=offscreen .venv/bin/python launcher.py --smoke-test
+.venv/bin/python - <<'PY'
+import json, os
+from pathlib import Path
+Path('deck_installer/build-info.json').write_text(json.dumps({'build': int(os.environ.get('GITHUB_RUN_NUMBER', '0'))}))
+PY
 .venv/bin/pyinstaller --noconfirm --clean --onedir --windowed --name bpp-deck \
   --add-data 'deck_installer/payload-inventory.json:deck_installer' \
+  --add-data 'deck_installer/build-info.json:deck_installer' --collect-data certifi --copy-metadata certifi \
   --add-binary 'vendor/7zz:vendor' launcher.py
 mkdir -p AppDir/usr/bin AppDir/usr/share/licenses
 cp -a dist/bpp-deck/. AppDir/usr/bin/
@@ -42,4 +48,6 @@ ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 build/tools/appimagetool \
 python3 scripts/verify-appimage.py dist/BazaarPlusPlus-SteamDeck-x86_64.AppImage
 QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 dist/BazaarPlusPlus-SteamDeck-x86_64.AppImage --smoke-test
 QT_QPA_PLATFORM=xcb APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a dist/BazaarPlusPlus-SteamDeck-x86_64.AppImage --smoke-test
+SSL_CERT_FILE=/nonexistent SSL_CERT_DIR=/nonexistent APPIMAGE_EXTRACT_AND_RUN=1 \
+  dist/BazaarPlusPlus-SteamDeck-x86_64.AppImage --network-test
 (cd dist && sha256sum BazaarPlusPlus-SteamDeck-x86_64.AppImage > SHA256SUMS)
