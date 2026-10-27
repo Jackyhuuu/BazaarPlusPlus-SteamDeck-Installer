@@ -8,3 +8,4 @@ AppDir/
 vendor/*
 !vendor/.gitkeep
 *.spec
+deck_installer/build-info.json
