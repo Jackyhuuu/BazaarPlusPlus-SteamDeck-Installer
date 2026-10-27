@@ -25,6 +25,9 @@ TEXT = {
     'logs': ('打开日志文件夹', 'Open logs folder'),
     'ready': ('准备就绪。请先关闭游戏。', 'Ready. Close the game before installing.'),
     'none': ('未检测到游戏，请手动选择游戏目录。', 'Game not detected. Please choose its folder.'),
+    'scanning': ('正在扫描 Steam 游戏库，请稍候…', 'Scanning Steam libraries, please wait…'),
+    'notfound': ('未找到包含 TheBazaar.exe 和 TheBazaar_Data 的目录。\n\n在 Steam 中打开：游戏 → 属性 → 已安装文件 → 浏览。\n然后回到安装器点击「选择目录」，选择 Steam 打开的目录。\n\n扫描过的位置和读取错误已记录在下方日志中。',
+                 'No folder containing TheBazaar.exe and TheBazaar_Data was found.\n\nIn Steam, open Game → Properties → Installed Files → Browse.\nThen use Browse in this installer to select that folder.\n\nScanned locations and read errors are listed in the log.'),
     'multiple': ('检测到多个游戏目录，请选择', 'Multiple game folders found; choose one'),
     'installed': ('当前 Mod：', 'Installed mod: '),
     'unknown': ('未安装 / 未知', 'Not installed / unknown'),
@@ -41,6 +44,18 @@ TEXT = {
                'To load the mod under Proton: add this line in Steam → Properties → Launch Options.\nMerge with any existing options. This installer does not edit them.'),
     'copy': ('复制启动选项', 'Copy launch options'),
 }
+
+
+class Detector(QThread):
+    message = Signal(str, str)
+    result = Signal(object)
+    error = Signal(str)
+
+    def run(self):
+        try:
+            self.result.emit(core.discover(report=self.message.emit))
+        except Exception:
+            self.error.emit(traceback.format_exc())
 
 
 class Worker(QThread):
@@ -111,7 +126,7 @@ class Window(QMainWindow):
         self.browse.clicked.connect(self.choose_folder)
         row.addWidget(self.browse)
         self.detect = QPushButton()
-        self.detect.clicked.connect(self.detect_game)
+        self.detect.clicked.connect(lambda: self.detect_game(True))
         row.addWidget(self.detect)
         layout.addLayout(row)
         self.version = QLabel()
@@ -154,7 +169,7 @@ class Window(QMainWindow):
         self.translate(self.lang)
         self.status.setText(self.t('ready'))
         if not self.path.text():
-            QTimer.singleShot(0, self.detect_game)
+            QTimer.singleShot(0, lambda: self.detect_game(False))
 
     def t(self, key):
         return TEXT[key][self.lang]
@@ -181,16 +196,40 @@ class Window(QMainWindow):
         if path:
             self.path.setText(path)
 
-    def detect_game(self):
-        games = core.discover()
+    def detect_game(self, manual=True):
+        if self.worker and self.worker.isRunning():
+            return
+        for c in self.controls:
+            c.setEnabled(False)
+        self.status.setText(self.t('scanning'))
+        self.bar.setRange(0, 0)
+        self.worker = Detector()
+        self.worker.message.connect(lambda zh, en: self.progress(-1, zh, en))
+        self.worker.result.connect(lambda games: self.detected(games, manual))
+        self.worker.error.connect(self.detect_failed)
+        self.worker.finished.connect(self.thread_finished)
+        self.worker.start()
+
+    def detect_failed(self, detail):
+        self.bar.setRange(0, 100)
+        self.progress(0, '检测失败，请查看日志', 'Detection failed; see the log')
+        self.progress(-1, detail, detail)
+        QMessageBox.warning(self, self.t('failed'), self.t('notfound'))
+
+    def detected(self, games, manual):
+        self.bar.setRange(0, 100)
+        self.bar.setValue(100 if games else 0)
         if len(games) == 1:
             self.path.setText(str(games[0]))
+            self.progress(100, '已找到游戏：' + str(games[0]), 'Game found: ' + str(games[0]))
         elif games:
             choice, ok = QInputDialog.getItem(self, self.t('directory'), self.t('multiple'), list(map(str, games)), 0, False)
             if ok:
                 self.path.setText(choice)
         else:
             self.status.setText(self.t('none'))
+            if manual:
+                QMessageBox.information(self, self.t('detect'), self.t('notfound'))
 
     def import_exe(self):
         path, _ = QFileDialog.getOpenFileName(self, self.t('local'), str(Path.home() / 'Downloads'), 'Windows installer (*.exe)')
