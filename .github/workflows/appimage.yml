@@ -19,7 +19,7 @@ jobs:
       - name: Install Linux GUI and packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxkbcommon-x11-0 libopengl0 zsync desktop-file-utils squashfs-tools fonts-noto-cjk
+          sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-shape0 libxkbcommon-x11-0 libopengl0 zsync desktop-file-utils squashfs-tools fonts-noto-cjk xvfb xauth
       - name: Build and validate AppImage
         run: bash scripts/build-appimage.sh
       - uses: actions/upload-artifact@v4
