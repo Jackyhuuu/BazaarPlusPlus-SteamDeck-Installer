@@ -122,25 +122,95 @@ def download(release, dest, emit):
     verify(dest, release)
 
 
-def discover(home=None, media=None):
+def discover(home=None, media=None, report=lambda zh, en: None):
+    """Read Steam libraries/manifests, then probe bounded nested game locations.
+
+    A broken/unmounted library must not abort detection of the remaining libraries.
+    report is safe to connect to a worker-thread signal; never touches the GUI.
+    """
     home = Path(home or Path.home())
-    roots = [home / '.local/share/Steam', home / '.steam/steam',
+    roots = [home / '.local/share/Steam', home / '.steam/steam', home / '.steam/root',
+             home / '.steam/debian-installation',
              home / '.var/app/com.valvesoftware.Steam/.local/share/Steam']
-    for root in list(roots):
-        vdf = root / 'steamapps/libraryfolders.vdf'
-        if vdf.exists():
-            roots += [Path(p.replace('\\\\', '\\')) for p in
-                      re.findall(r'"path"\s*"([^"]+)"', vdf.read_text(errors='replace'))]
-    for base in [Path(media)] if media else [Path('/run/media') / home.name, Path('/run/media')]:
-        if base.is_dir():
-            roots += [p for p in base.iterdir() if p.is_dir()]
+    if home == Path.home():
+        roots.append(Path(os.environ.get('XDG_DATA_HOME', home / '.local/share')) / 'Steam')
+
+    def children(path):
+        try:
+            return sorted(path.iterdir())
+        except OSError as exc:
+            report('无法读取：' + str(path) + ' (' + str(exc) + ')',
+                   'Cannot read: ' + str(path) + ' (' + str(exc) + ')')
+            return []
+
+    def text(path):
+        try:
+            return path.read_text(errors='replace')
+        except OSError:
+            return ''
+
+    # Steam Deck SD cards can have a SteamLibrary subdirectory below the mount.
+    mounts = [Path(media)] if media else [Path('/run/media'), Path('/media'), Path('/mnt')]
+    for base in mounts:
+        if not base.is_dir():
+            continue
+        queue = [(base, 0)]
+        visited = 0
+        while queue and visited < 2000:
+            p, depth = queue.pop(0)
+            visited += 1
+            if (p / 'steamapps').is_dir():
+                roots.append(p)
+                continue
+            if depth < 3:
+                queue.extend((q, depth + 1) for q in children(p)
+                             if q.is_dir() and not q.is_symlink() and not q.name.startswith('.'))
+
+    seen = set()
     found = set()
-    for root in roots:
+    for root in roots:  # Follow newly found VDF library roots too.
+        root = root.expanduser().resolve()
+        if root in seen or not root.is_dir():
+            continue
+        seen.add(root)
+        if len(seen) > 100:
+            break
+        report('扫描 Steam 库：' + str(root), 'Scanning Steam library: ' + str(root))
+        for config in ['steamapps/libraryfolders.vdf', 'config/libraryfolders.vdf']:
+            vdf = text(root / config)
+            paths = re.findall(r'"path"\s*"([^"]+)"', vdf, re.IGNORECASE)
+            # Older Steam versions use numeric key/string pairs instead of objects.
+            paths += re.findall(r'"\d+"\s*"(/[^"\n]+)"', vdf)
+            roots.extend(Path(p.replace('\\\\', '\\')) for p in paths)
         common = root / 'steamapps/common'
+        candidates = []
+        for manifest in (root / 'steamapps').glob('appmanifest_*.acf'):
+            contents = text(manifest)
+            if 'bazaar' not in contents.casefold():
+                continue
+            match = re.search(r'"installdir"\s*"([^"]+)"', contents, re.IGNORECASE)
+            if match:
+                installed = common / match.group(1)
+                if installed.resolve().is_relative_to(common.resolve()):
+                    candidates.append((installed, 3))
+                    report('Steam 清单记录：' + str(installed), 'Steam manifest location: ' + str(installed))
         if common.is_dir():
-            for p in common.iterdir():
-                if (p / 'TheBazaar.exe').is_file():
-                    found.add(p.resolve())
+            candidates.extend((p, 3 if 'bazaar' in p.name.casefold() else 0)
+                              for p in children(common) if p.is_dir())
+        probed = set()
+        while candidates:
+            p, depth = candidates.pop(0)
+            if p in probed:
+                continue
+            probed.add(p)
+            if (p / 'TheBazaar.exe').is_file() and (p / 'TheBazaar_Data').is_dir():
+                found.add(p.resolve())
+                report('找到游戏：' + str(p), 'Found game: ' + str(p))
+            elif depth and p.is_dir():
+                candidates.extend((q, depth - 1) for q in children(p)
+                                  if q.is_dir() and not q.is_symlink())
+    report('扫描完成，找到 ' + str(len(found)) + ' 个游戏目录',
+           'Scan complete: ' + str(len(found)) + ' game folder(s) found')
     return sorted(found)
 
 
