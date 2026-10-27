@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=BazaarPlusPlus Steam Deck Installer
+Name[zh_CN]=巴扎加加 Steam Deck 安装器
+Exec=bpp-deck
+Icon=bpp-deck
+Categories=Game;Utility;
+Terminal=false
