@@ -2,18 +2,18 @@
 
 独立社区项目，为 Steam Deck / Linux x86_64 提供原生 Qt 图形安装窗口，将**官方 Windows 版 Mod** 安装到通过 Proton 运行的《The Bazaar》。支持中文 / English，不打开浏览器界面。
 
-0.2.0 更新：主页面直接显示已安装版本与官方最新版，提供「检查更新」和明确的更新按钮；启动时自动检查 Mod 版本。底部「安装器更新」可检查本项目的新 AppImage，并在发现新版时打开下载页。高级选项与日志默认折叠。HTTPS 使用随包内置的 Mozilla 根证书，解决 SteamOS 上缺少打包机证书路径导致的 CERTIFICATE_VERIFY_FAILED；不关闭证书验证。
+1.0.0 是第一个正式版。保留中英文简洁界面、明确的 Mod 版本与更新按钮、安装器更新检查，以及内置 CA 根证书修复。新增主页面「1280×800 启动优化」入口：打开后复制完整配置，在 Steam 游戏属性中粘贴一次；此后每次启动请求 1280×800 无边框全屏。可取消勾选恢复普通 Mod 加载参数。该预设并非已证实的 800×600 根因修复，仍需设备验证；安装器不会直接写入 Steam 配置、游戏画面配置或系统显示设置。
 
 ## 下载与使用
 
-发布下载：[Releases](https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/releases)。开发构建：[AppImage Actions](https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/actions/workflows/appimage.yml)，成功运行的 Artifacts 中包含 AppImage 和 SHA256SUMS；GitHub 下载 Actions 产物需要登录。main 和带 v 标签的成功构建会自动发布预览版，可直接下载单个 AppImage。
+发布下载：[Releases](https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/releases)。开发构建：[AppImage Actions](https://github.com/Jackyhuuu/BazaarPlusPlus-SteamDeck-Installer/actions/workflows/appimage.yml)，成功运行的 Artifacts 中包含 AppImage 和 SHA256SUMS；GitHub 下载 Actions 产物需要登录。带 v 标签的成功构建会发布对应正式版；main 构建首次发布 v1.0.0，之后不会覆盖已发布的同名版本。可直接下载单个 AppImage。
 
 1. Steam Deck 进入桌面模式，下载 `BazaarPlusPlus-SteamDeck-x86_64.AppImage`。
 2. 文件属性 → 权限 → 允许作为程序执行，然后双击打开。
 3. 关闭游戏，确认自动检测的目录，点击「一键安装 / 更新」。也可导入官方 Windows EXE。
-4. 如果尚未配置过 BepInEx，在 Steam 游戏属性的启动选项中加入 `WINEDLLOVERRIDES="winhttp=n,b" %command%`。窗口有复制按钮；已有自定义选项时需合并。
+4. 点击「1280×800 启动优化」，复制程序生成的完整启动配置，粘贴到 Steam 游戏属性的启动选项中一次。已有自定义选项时需合并。若想保留原分辨率行为，取消「以 1280×800 无边框全屏启动游戏」勾选，再复制普通 Mod 参数。
 
-**不修改分辨率、Steam 启动参数、Proton 配置或存档。** 自动构建和启动检查不等于 Steam Deck 实机游戏验证。此项目使用 Windows Mod，Windows 专有功能（例如 Media Foundation 回放录制）在 Proton 下的可用性仍需实测。
+**不直接修改桌面显示设置、Steam 配置、Proton 配置或存档。** 分辨率预设只有粘贴到 Steam 启动选项后才生效。用户已在 Steam Deck 上确认前版可正常下载、重新安装和进入游戏；新加入的分辨率预设效果仍待实测。此项目使用 Windows Mod，Windows 专有功能（例如 Media Foundation 回放录制）在 Proton 下的可用性仍需实测。
 
 ## 功能与边界
 
@@ -37,10 +37,12 @@ GitHub Actions 自动运行单元测试、真实官方 5.7.0 EXE 安装/更新/�
 
 ## 验证记录
 
-2026-10-27：通过真实官方 `BazaarPlusPlus_5.7.0_x64-setup.exe` 集成测试，SHA256 为 `91c2386aea38118d1f9a12ef0b7ff95ad9ff816878e742319d23fa81b2f1f25c`；提取并验证 37 个 payload 文件。11 项测试涵盖安装、更新、恢复、失败回滚、断电恢复、外置库检测和路径/哈希防护。Steam Deck 硬件验证尚未进行。
+2026-10-27：通过真实官方 `BazaarPlusPlus_5.7.0_x64-setup.exe` 集成测试，SHA256 为 `91c2386aea38118d1f9a12ef0b7ff95ad9ff816878e742319d23fa81b2f1f25c`；提取并验证 37 个 payload 文件。23 项测试涵盖安装、更新、恢复、失败回滚、断电恢复、游戏库检测、证书、更新状态和分辨率配置生成。用户已确认前版在 Steam Deck 上可下载、重装和进入游戏；新增 1280×800 预设仍待实机确认。
 
 MIT License。上游及打包依赖说明见 THIRD-PARTY.md。
 
 ## English
 
 Native Chinese/English Qt GUI for installing the official Windows BazaarPlusPlus mod into The Bazaar under Proton. Download the AppImage from Releases, enable execution, open it in Desktop Mode and select Install / Update. Python, Qt and 7zz are bundled. Official manifest size and SHA256 verification are mandatory. Local EXEs require either the current official hash online or a trusted hash entered by the user. Backups, rollback, progress, logs and Steam library discovery are included. Display settings, save data, Steam options and Proton settings are not edited. Steam Deck game compatibility needs hardware validation; passing CI is not a claim that every mod feature works under Proton.
+
+The 1.0.0 stable release adds an optional 1280×800 borderless launch preset. Open the resolution entry, copy the generated line and paste it into Steam Launch Options once, merging any custom options. This prepares Unity launch arguments and is not a verified diagnosis of the 800×600 reset. System display settings and Steam configuration files are never edited automatically.
