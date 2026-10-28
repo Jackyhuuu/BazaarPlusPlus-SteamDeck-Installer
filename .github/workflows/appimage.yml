@@ -47,9 +47,33 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.0.0' }}
           REVISION: ${{ github.sha }}
+          RELEASE_NOTES: |
+            ## English
+            
+            First stable release of the native Linux x86_64 installer for BazaarPlusPlus on Steam Deck.
+            
+            Features include a Chinese/English GUI, official downloads with SHA256 verification and bundled CA certificates, version checks, local Windows EXE import, automatic backups, and Steam library detection.
+            
+            An optional 1280×800 borderless fullscreen preset is available in the installer. Copy the generated configuration into Steam Launch Options once, merging any existing custom options. The installer does not directly edit Steam configuration or desktop display settings.
+            
+            Automated Linux tests and startup checks have passed. A user has confirmed that the previous installer can download, reinstall the mod, and launch the game on Steam Deck. The new resolution preset still needs hardware confirmation.
+            
+            ---
+            
+            ## 中文
+            
+            Steam Deck 上 BazaarPlusPlus 原生 Linux x86_64 安装器的首个正式版。
+            
+            提供中英文图形界面、官方文件下载与 SHA256 校验、内置 CA 根证书、版本检查、本地 Windows EXE 导入、自动备份和 Steam 游戏库检测。
+            
+            安装器内提供可选的 1280×800 无边框全屏启动预设。复制生成的完整配置，在 Steam 游戏启动选项中粘贴一次；已有自定义选项时请合并。安装器不会直接编辑 Steam 配置或桌面显示设置。
+            
+            自动化 Linux 测试和启动检查已通过。用户已确认前版安装器在 Steam Deck 上可正常下载、重新安装 Mod 并启动游戏；新增分辨率预设仍需实机确认。
+
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; keeping its published assets unchanged."
           else
-            gh release create "$TAG" release/* --target "$REVISION" --latest --title "$TAG · Steam Deck Installer" --notes 'First stable release. Native Chinese/English GUI, verified official downloads with bundled CA roots, version checks, local EXE import, backups and Steam library detection. Includes an optional 1280×800 borderless launch preset: copy it to Steam Launch Options once. The installer does not edit Steam settings or the desktop display. Automated Linux tests pass; the new resolution preset still needs confirmation on Steam Deck hardware.'
+            printf '%s\n' "$RELEASE_NOTES" > release-notes.md
+            gh release create "$TAG" release/* --target "$REVISION" --latest --title "$TAG · Steam Deck Installer" --notes-file release-notes.md
           fi
